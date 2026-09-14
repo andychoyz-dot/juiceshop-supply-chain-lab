@@ -25,15 +25,15 @@ jobs:
       - name: Install Dependencies
         run: npm install --legacy-peer-deps --ignore-scripts
 
-      # 2. Install Syft and Grype CLIs directly (bypasses GitHub Action wrapper bugs)
+      # 2. Install Syft and Grype CLIs directly
       - name: Install Syft and Grype CLIs
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
-      # 3. Force Syft to scan node_modules directly without ignoring gitignored folders
+      # 3. FIXED: Generate Full SBOM using standard shell redirection
       - name: Generate Full SBOM
-        run: syft dir:./node_modules --exclude "" -o spdx-json=juiceshop.sbom.json
+        run: syft dir:./node_modules --exclude "" -o spdx-json > juiceshop.sbom.json
 
       # 4. Upload raw SBOM artifact for download/verification
       - name: Upload SBOM Artifact
@@ -55,13 +55,13 @@ jobs:
           sarif_file: results.sarif
           category: "grype-sbom"
 
-      # Install GuardDog via pip
+      # 7. Install GuardDog via pip
       - name: Install GuardDog & jq
         run: |
           pip3 install guarddog
           sudo apt-get install -y jq
 
-      # Parse package.json and run GuardDog scan on each package name
+      # 8. Parse package.json and run GuardDog scan on each package name
       - name: Run GuardDog Dependency Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -76,7 +76,6 @@ jobs:
           for dep in $DEPS; do
             echo "----------------------------------------"
             echo "Scanning package: $dep"
-            # Use 'scan' for remote npm registry packages
             guarddog npm scan "$dep" \
               --exclude-rules metadata_mismatch \
               --exclude-rules potentially_compromised_email_domain \
